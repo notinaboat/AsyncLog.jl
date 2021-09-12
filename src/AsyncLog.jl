@@ -24,7 +24,28 @@ julia> @asynclog "my background loop" while true
 """
 module AsyncLog
 
-export @asynclog
+export @asynclog, @asynclog_loop, @errorlog
+
+
+"""
+    @errorlog "label" expression...
+
+Run `expression` in a `try/catch` block.
+Log errors though `@error`.
+Use `"label"` to identify error logs.
+"""
+macro errorlog(label, expr)
+    quote
+        try
+            $(esc(expr))
+        catch err
+            exception=(err, catch_backtrace())
+            label = $(esc(label)) 
+            @error "Error in: \"$label\"" exception
+            rethrow(err)
+        end
+    end
+end
 
 
 """
@@ -35,16 +56,26 @@ Log errors though `@error`.
 Use `"label"` to identify error logs.
 """
 macro asynclog(label, expr)
-    quote
-        @async try
-            $(esc(expr))
-        catch err
-            exception=(err, catch_backtrace())
-            label = $(esc(label)) 
-            @error "Error in: \"$label\"" exception
-            rethrow(err)
+    esc(quote
+        @async @errorlog $label $expr
+    end)
+end
+
+
+"""
+    @asynclog_loop "label" expression...
+
+Run `@async expression` in a `try/catch` block.
+Log errors though `@error`.
+Use `"label"` to identify error logs.
+Restart `expression` after errors.
+"""
+macro asynclog_loop(label, expr)
+    esc(quote
+        @async while true
+            @errorlog $label $expr
         end
-    end
+    end)
 end
 
 
