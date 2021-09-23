@@ -73,7 +73,10 @@ Restart `expression` after errors.
 macro asynclog_loop(label, expr)
     esc(quote
         @async while true
-            @errorlog $label $expr
+            try
+                @errorlog $label $expr
+            catch
+            end
         end
     end)
 end
