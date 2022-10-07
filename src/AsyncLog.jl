@@ -39,10 +39,21 @@ macro errorlog(label, expr)
         try
             $(esc(expr))
         catch err
-            exception=(err, catch_backtrace())
-            label = $(esc(label)) 
-            @error "Error in: \"$label\"" exception
-            rethrow(err)
+            # https://github.com/JuliaLang/julia/issues/25790#issuecomment-619525903
+            if false &&
+               isa(err, InterruptException) &&
+               isdefined(Base, :active_repl_backend) &&
+               Base.active_repl_backend.backend_task.state === :runnable &&
+               isempty(Base.Workqueue) &&
+               Base.active_repl_backend.in_eval
+
+                @async Base.throwto(Base.active_repl_backend.backend_task, err)
+            else
+                exception=(err, catch_backtrace())
+                label = $(esc(label)) 
+                @error "Error in: \"$label\"" exception
+                rethrow(err)
+            end
         end
     end
 end
